@@ -13,16 +13,32 @@ exports.recordPurchase = async (req, res) => {
     let asset;
 
     if (isNewAsset) {
-      asset = new Asset({
-        name,
-        type,
-        baseId,
-        quantity: qty,
-        openingBalance: totalCost,
-        closingBalance: totalCost
-      });
-      await asset.save();
+      // Check if asset with same name, type, and baseId already exists
+      const existingAsset = await Asset.findOne({ name, type, baseId });
+
+      if (existingAsset) {
+        // If found, treat it as update instead of duplicate
+        asset = existingAsset;
+        asset.quantity += qty;
+        asset.closingBalance += totalCost;
+        if (asset.openingBalance === 0) {
+          asset.openingBalance = asset.closingBalance;
+        }
+        await asset.save();
+      } else {
+        // New asset creation
+        asset = new Asset({
+          name,
+          type,
+          baseId,
+          quantity: qty,
+          openingBalance: totalCost,
+          closingBalance: totalCost
+        });
+        await asset.save();
+      }
     } else {
+      // Update existing asset by ID
       asset = await Asset.findById(assetId);
       if (!asset) return res.status(404).json({ message: 'Asset not found' });
 
@@ -36,6 +52,7 @@ exports.recordPurchase = async (req, res) => {
       await asset.save();
     }
 
+    // Record purchase transaction
     const purchase = new Purchase({
       assetId: asset._id,
       baseId,
@@ -47,16 +64,17 @@ exports.recordPurchase = async (req, res) => {
 
     await purchase.save();
 
+    // Populate response with asset & base info
     const populatedPurchase = await Purchase.findById(purchase._id)
       .populate('assetId', 'name type')
       .populate('baseId', 'name');
 
     res.status(201).json({ message: 'Purchase recorded successfully', purchase: populatedPurchase });
+
   } catch (err) {
     res.status(500).json({ error: 'Purchase failed', details: err.message });
   }
 };
-
 
 exports.getPurchases = async (req, res) => {
   try {

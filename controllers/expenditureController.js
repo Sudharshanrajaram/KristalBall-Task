@@ -11,7 +11,10 @@ exports.recordExpenditure = async (req, res) => {
       return res.status(400).json({ message: 'Missing required fields' });
     }
 
-    if (!mongoose.Types.ObjectId.isValid(assetId) || !mongoose.Types.ObjectId.isValid(baseId)) {
+    if (
+      !mongoose.Types.ObjectId.isValid(assetId) ||
+      !mongoose.Types.ObjectId.isValid(baseId)
+    ) {
       return res.status(400).json({ message: 'Invalid ID format' });
     }
 
@@ -27,7 +30,11 @@ exports.recordExpenditure = async (req, res) => {
       return res.status(400).json({ message: 'Asset does not belong to specified base' });
     }
 
-    // Get recent purchase to calculate cost
+    if (asset.quantity < quantity) {
+      return res.status(400).json({ message: 'Not enough quantity in stock to expend' });
+    }
+
+    // Get latest cost from recent purchase
     const latestPurchase = await Purchase.findOne({ assetId, baseId }).sort({ date: -1 });
     if (!latestPurchase) {
       return res.status(400).json({ message: 'No purchase found to determine cost' });
@@ -35,6 +42,7 @@ exports.recordExpenditure = async (req, res) => {
 
     const cost = quantity * latestPurchase.costPerUnit;
 
+    // Record expenditure
     const expenditure = new Expenditure({
       assetId,
       baseId,
@@ -43,14 +51,30 @@ exports.recordExpenditure = async (req, res) => {
       expendReason,
       recordedBy: userId,
       date: new Date(),
-      cost // Add cost here
+      cost
     });
 
     await expenditure.save();
-    res.status(201).json({ message: 'Expenditure recorded successfully', expenditure });
+
+    // Reduce quantity and closing balance in the asset
+    asset.quantity -= quantity;
+    asset.closingBalance -= cost;
+
+    // Prevent negative balance
+    if (asset.closingBalance < 0) asset.closingBalance = 0;
+
+    await asset.save();
+
+    res.status(201).json({
+      message: 'Expenditure recorded successfully',
+      expenditure
+    });
   } catch (err) {
     console.error('Expenditure Save Error:', err);
-    res.status(500).json({ message: 'Failed to record expenditure', error: err.message });
+    res.status(500).json({
+      message: 'Failed to record expenditure',
+      error: err.message
+    });
   }
 };
 
