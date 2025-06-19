@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const Expenditure = require('../models/Expenditure');
 const Asset = require('../models/Assets');
-
+const Purchase = require('../models/Purchase'); 
 exports.recordExpenditure = async (req, res) => {
   try {
     let { assetId, baseId, quantity, expendType, expendReason } = req.body;
@@ -23,9 +23,17 @@ exports.recordExpenditure = async (req, res) => {
     const asset = await Asset.findById(assetId);
     if (!asset) return res.status(404).json({ message: 'Asset not found' });
 
-    if (asset.baseId.toString() !== baseId) {
+    if (!asset.baseId || asset.baseId.toString() !== baseId) {
       return res.status(400).json({ message: 'Asset does not belong to specified base' });
     }
+
+    // Get recent purchase to calculate cost
+    const latestPurchase = await Purchase.findOne({ assetId, baseId }).sort({ date: -1 });
+    if (!latestPurchase) {
+      return res.status(400).json({ message: 'No purchase found to determine cost' });
+    }
+
+    const cost = quantity * latestPurchase.costPerUnit;
 
     const expenditure = new Expenditure({
       assetId,
@@ -34,7 +42,8 @@ exports.recordExpenditure = async (req, res) => {
       expendType,
       expendReason,
       recordedBy: userId,
-      date: new Date()
+      date: new Date(),
+      cost // Add cost here
     });
 
     await expenditure.save();
@@ -44,6 +53,8 @@ exports.recordExpenditure = async (req, res) => {
     res.status(500).json({ message: 'Failed to record expenditure', error: err.message });
   }
 };
+
+
 
 exports.getExpenditures = async (req, res) => {
   try {

@@ -1,9 +1,22 @@
+const mongoose = require('mongoose');
 const Asset = require('../models/Assets');
 const Purchase = require('../models/Purchase');
 
 exports.recordPurchase = async (req, res) => {
   try {
     const { isNewAsset, name, type, assetId, quantity, costPerUnit, baseId } = req.body;
+
+    if (!quantity || isNaN(quantity) || quantity <= 0) {
+      return res.status(400).json({ message: 'Invalid quantity' });
+    }
+
+    if (!costPerUnit || isNaN(costPerUnit) || costPerUnit <= 0) {
+      return res.status(400).json({ message: 'Invalid cost per unit' });
+    }
+
+    if (!isNewAsset && (!assetId || !mongoose.Types.ObjectId.isValid(assetId))) {
+      return res.status(400).json({ message: 'Invalid or missing asset ID' });
+    }
 
     const qty = parseInt(quantity);
     const cost = parseFloat(costPerUnit);
@@ -19,7 +32,8 @@ exports.recordPurchase = async (req, res) => {
         baseId,
         quantity: qty,
         openingBalance: totalCost,
-        closingBalance: totalCost
+        closingBalance: totalCost,
+        status: 'Active'
       });
       await asset.save();
     } else {

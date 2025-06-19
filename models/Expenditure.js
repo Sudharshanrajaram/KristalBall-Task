@@ -7,6 +7,7 @@ const ExpenditureSchema = new mongoose.Schema({
   expendType: { type: String, enum: ['Used', 'Transfered', 'Expired'], default: 'Transfered' },
   expendReason: { type: String, required: true },
   recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+  cost: { type: Number, required: true },  
   date: { type: Date, default: Date.now }
 });
 
