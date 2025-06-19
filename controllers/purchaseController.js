@@ -46,11 +46,17 @@ exports.recordPurchase = async (req, res) => {
     });
 
     await purchase.save();
-    res.status(201).json({ message: 'Purchase recorded successfully' });
+
+    const populatedPurchase = await Purchase.findById(purchase._id)
+      .populate('assetId', 'name type')
+      .populate('baseId', 'name');
+
+    res.status(201).json({ message: 'Purchase recorded successfully', purchase: populatedPurchase });
   } catch (err) {
     res.status(500).json({ error: 'Purchase failed', details: err.message });
   }
 };
+
 
 exports.getPurchases = async (req, res) => {
   try {

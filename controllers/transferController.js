@@ -6,6 +6,8 @@ exports.createTransfer = async (req, res) => {
   try {
     let { assetId, fromBaseId, toBaseId, quantity } = req.body;
     quantity = parseInt(quantity, 10);
+
+    // Validation
     if (
       !mongoose.Types.ObjectId.isValid(assetId) ||
       !mongoose.Types.ObjectId.isValid(fromBaseId) ||
@@ -33,12 +35,14 @@ exports.createTransfer = async (req, res) => {
     asset.quantity -= quantity;
     const fromAssetQuantityAfter = asset.quantity;
 
+    // Save or remove source asset
     if (asset.quantity === 0) {
       await asset.deleteOne();
     } else {
       await asset.save();
     }
 
+    // Handle destination base's asset
     let toAsset = await Asset.findOne({
       name: asset.name,
       type: asset.type,
@@ -63,6 +67,7 @@ exports.createTransfer = async (req, res) => {
 
     const toAssetQuantityAfter = toAsset.quantity;
 
+    // Create transfer record
     const transfer = new Transfer({
       assetId: asset._id,
       fromBaseId,
@@ -78,9 +83,9 @@ exports.createTransfer = async (req, res) => {
 
     await transfer.save();
 
-    res.status(201).json({ message: 'Asset quantity transferred successfully', transfer });
+    return res.status(201).json({ message: 'Asset quantity transferred successfully', transfer });
   } catch (err) {
-    res.status(500).json({ message: 'Failed to transfer asset', error: err.message });
+    return res.status(500).json({ message: 'Failed to transfer asset', error: err.message });
   }
 };
 
@@ -93,8 +98,8 @@ exports.getTransfers = async (req, res) => {
       .populate('transferredBy')
       .sort({ createdAt: -1 });
 
-    res.json(transfers);
+    return res.json(transfers);
   } catch (err) {
-    res.status(500).json({ message: 'Failed to fetch transfers', error: err.message });
+    return res.status(500).json({ message: 'Failed to fetch transfers', error: err.message });
   }
 };
